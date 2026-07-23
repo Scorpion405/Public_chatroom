@@ -1,0 +1,1141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Obsidian Lounge</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+
+  <style>
+    * { box-sizing: border-box; }
+
+    :root {
+      --bg-deepest: #1e1f22;
+      --bg-rail: #1e1f22;
+      --bg-sidebar: #2b2d31;
+      --bg-chat: #313338;
+      --bg-panel: #2b2d31;
+      --bg-elevated: #383a40;
+      --bg-input: #383a40;
+      --text-normal: #dbdee1;
+      --text-muted: #949ba4;
+      --text-bright: #f2f3f5;
+      --accent: #5865f2;
+      --accent-hover: #4752c4;
+      --online-dot: #23a55a;
+      --danger: #ed4245;
+      --border: #26272b;
+    }
+
+    body {
+      margin: 0;
+      font-family: 'Inter', 'Segoe UI', sans-serif;
+      background: var(--bg-deepest);
+      color: var(--text-normal);
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #1a1b1e; border-radius: 4px; }
+    .channel-sidebar ::-webkit-scrollbar-thumb,
+    .online-users ::-webkit-scrollbar-thumb { background: #232428; }
+
+    .app { display: none; height: 100vh; }
+    .app.visible { display: flex; }
+
+    .server-rail {
+      width: 72px;
+      flex-shrink: 0;
+      background: var(--bg-rail);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: 12px;
+    }
+
+    .server-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 16px;
+      background: var(--accent);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 15px;
+      letter-spacing: 0.5px;
+      cursor: default;
+      transition: border-radius 0.15s ease;
+    }
+    .server-icon:hover { border-radius: 30%; }
+
+    .channel-sidebar {
+      width: 232px;
+      flex-shrink: 0;
+      background: var(--bg-sidebar);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .server-header {
+      padding: 14px 16px;
+      font-weight: 700;
+      font-size: 15px;
+      color: var(--text-bright);
+      border-bottom: 1px solid var(--border);
+      box-shadow: 0 1px 0 rgba(0,0,0,0.15);
+    }
+
+    .channel-list { flex: 1; overflow-y: auto; padding: 12px 8px; }
+
+    .channel-category {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      padding: 12px 8px 4px;
+    }
+
+    .channel-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      width: 100%;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 14px;
+      font-weight: 500;
+      padding: 7px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      text-align: left;
+      margin-bottom: 2px;
+    }
+    .channel-item:hover { background: #35373c; color: var(--text-bright); }
+    .channel-item.active { background: var(--bg-elevated); color: var(--text-bright); }
+    .channel-item .hash { color: var(--text-muted); font-weight: 600; }
+
+    .user-panel { display: flex; align-items: center; gap: 8px; padding: 8px; background: #232428; }
+
+    .avatar {
+      width: 32px; height: 32px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      color: white; font-weight: 700; font-size: 13px; flex-shrink: 0;
+    }
+
+    .user-panel-info { flex: 1; min-width: 0; }
+    .user-panel-name {
+      font-size: 13px; font-weight: 600; color: var(--text-bright);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .user-panel-status { font-size: 11px; color: var(--online-dot); }
+
+    #logoutBtn {
+      background: transparent; border: none; color: var(--text-muted);
+      cursor: pointer; font-size: 16px; width: 30px; height: 30px;
+      border-radius: 4px; flex-shrink: 0;
+    }
+    #logoutBtn:hover { background: #3a3c42; color: var(--danger); }
+
+    .chat-container { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg-chat); }
+
+    .chat-header {
+      height: 48px; flex-shrink: 0; display: flex; align-items: center; gap: 6px;
+      padding: 0 16px; border-bottom: 1px solid var(--border);
+      box-shadow: 0 1px 0 rgba(0,0,0,0.15); font-weight: 700; color: var(--text-bright); font-size: 15px;
+    }
+    .chat-header-hash { color: var(--text-muted); font-weight: 700; }
+
+    #messages { flex: 1; padding: 16px 0 8px; overflow-y: auto; display: flex; flex-direction: column; }
+
+    @keyframes msgIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+    .msg-row { display: flex; gap: 14px; padding: 2px 16px; cursor: pointer; animation: msgIn 0.15s ease; }
+    .msg-row:hover { background: rgba(4,4,5,0.15); }
+    .msg-row:not(.grouped) { margin-top: 14px; }
+
+    .msg-avatar {
+      width: 38px; height: 38px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      color: white; font-weight: 700; font-size: 15px; flex-shrink: 0; margin-top: 2px;
+    }
+
+    .msg-avatar-spacer { width: 38px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+    .msg-time-hover { font-size: 10px; color: var(--text-muted); opacity: 0; }
+    .msg-row:hover .msg-time-hover { opacity: 1; }
+
+    .msg-body { min-width: 0; flex: 1; }
+    .msg-meta { display: flex; align-items: baseline; gap: 8px; }
+    .msg-username { font-weight: 600; font-size: 15px; color: var(--text-bright); }
+    .msg-time { font-size: 11px; color: var(--text-muted); }
+
+    .msg-text { font-size: 15px; line-height: 1.4; color: var(--text-normal); word-wrap: break-word; white-space: pre-wrap; }
+
+    .reply-preview {
+      display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted);
+      border-left: 2px solid var(--accent); padding-left: 8px; margin-bottom: 3px;
+    }
+    .reply-preview b { color: var(--text-normal); font-weight: 600; }
+
+    .media-attachment { margin-top: 6px; }
+    .media-attachment img, .media-attachment video { max-width: 360px; max-height: 280px; border-radius: 8px; display: block; }
+    .media-attachment audio { width: 100%; max-width: 300px; }
+    .media-attachment a {
+      display: inline-flex; align-items: center; gap: 6px; background: var(--bg-elevated);
+      color: var(--text-normal); text-decoration: none; font-size: 13px; padding: 8px 12px; border-radius: 6px;
+    }
+    .media-attachment a:hover { background: #40434a; }
+
+    #typingIndicator { font-size: 12px; color: var(--text-muted); padding: 2px 16px; min-height: 18px; font-style: italic; }
+
+    #replyBar { background: #2b2d31; color: var(--text-muted); padding: 6px 16px; font-size: 12px; display: none; border-top: 1px solid var(--border); }
+
+    #mediaPreview { font-size: 12px; color: var(--text-muted); padding: 0 16px 6px; min-height: 16px; }
+
+    .input-box { padding: 0 16px 20px; flex-shrink: 0; }
+
+    .input-row { display: flex; gap: 10px; align-items: center; background: var(--bg-input); border-radius: 8px; padding: 6px; }
+
+    #attachBtn {
+      background: transparent; border: none; color: var(--text-muted); width: 34px; height: 34px;
+      border-radius: 50%; cursor: pointer; font-size: 16px; flex-shrink: 0;
+    }
+    #attachBtn:hover { background: #46484f; color: var(--text-bright); }
+
+    .input-box input#messageInput {
+      flex: 1; width: 100%; padding: 8px 4px; border: none; outline: none;
+      background: transparent; color: var(--text-normal); font-size: 15px; font-family: inherit;
+    }
+    .input-box input#messageInput::placeholder { color: var(--text-muted); }
+
+    .online-users { width: 232px; flex-shrink: 0; background: var(--bg-panel); padding: 16px 8px; overflow-y: auto; }
+
+    .online-header { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-muted); padding: 0 8px 8px; }
+
+    .online-users ul { list-style: none; padding: 0; margin: 0; }
+    .online-users li { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 4px; }
+    .online-users li:hover { background: #35373c; }
+
+    .avatar-wrap { position: relative; flex-shrink: 0; }
+    .status-dot {
+      position: absolute; bottom: -2px; right: -2px; width: 11px; height: 11px;
+      border-radius: 50%; background: var(--online-dot); border: 2.5px solid var(--bg-panel);
+    }
+
+    .online-users li span.name {
+      flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      font-size: 14px; color: var(--text-normal); font-weight: 500;
+    }
+
+    .dm-btn {
+      background: var(--bg-elevated); color: var(--text-muted); border: none; padding: 3px 8px;
+      font-size: 11px; border-radius: 4px; cursor: pointer; flex-shrink: 0; opacity: 0;
+    }
+    .online-users li:hover .dm-btn { opacity: 1; }
+    .dm-btn:hover { background: var(--accent); color: white; }
+
+
+    /* Profile pictures, message actions, reply highlighting, notifications */
+    .avatar, .msg-avatar { overflow: hidden; }
+    .avatar img, .msg-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .profile-settings-btn {
+      background: transparent; border: none; color: var(--text-muted); cursor: pointer;
+      width: 30px; height: 30px; border-radius: 4px; font-size: 15px;
+    }
+    .profile-settings-btn:hover { background: #3a3c42; color: var(--text-bright); }
+    .msg-row { position: relative; }
+    .msg-actions {
+      position: absolute; right: 16px; top: -8px; display: none; gap: 2px;
+      background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 6px;
+      padding: 3px; z-index: 3; box-shadow: 0 4px 12px rgba(0,0,0,.25);
+    }
+    .msg-row:hover .msg-actions { display: flex; }
+    .msg-action {
+      border: none; background: transparent; color: var(--text-muted); cursor: pointer;
+      padding: 4px 7px; border-radius: 4px; font-size: 12px;
+    }
+    .msg-action:hover { background: #46484f; color: var(--text-bright); }
+    .msg-action.delete:hover { color: var(--danger); }
+    .edited-label { color: var(--text-muted); font-size: 10px; margin-left: 4px; }
+    .deleted-message { color: var(--text-muted); font-style: italic; }
+    .reply-preview { cursor: pointer; }
+    .reply-preview:hover { color: var(--text-bright); }
+    .msg-row.reply-target-highlight {
+      background: rgba(88,101,242,.24);
+      box-shadow: inset 3px 0 0 var(--accent);
+      transition: background .2s ease;
+    }
+    .notification-badge {
+      display: none; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
+      background: var(--danger); color: white; font-size: 10px; font-weight: 700;
+      align-items: center; justify-content: center; margin-left: auto;
+    }
+    .notification-badge.visible { display: inline-flex; }
+    .profile-modal {
+      position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+      background: rgba(0,0,0,.65); z-index: 60;
+    }
+    .profile-modal.open { display: flex; }
+    .profile-card {
+      width: 360px; max-width: 90vw; background: var(--bg-sidebar); border-radius: 10px;
+      padding: 24px; box-shadow: 0 18px 50px rgba(0,0,0,.5);
+    }
+    .profile-card h3 { margin: 0 0 18px; color: var(--text-bright); }
+    .profile-preview { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+    .profile-preview .avatar { width: 64px; height: 64px; font-size: 22px; }
+    .profile-card input[type="file"] { width: 100%; color: var(--text-muted); font-size: 12px; }
+    .profile-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+    .profile-modal-actions button {
+      border: none; border-radius: 5px; padding: 9px 14px; cursor: pointer; font-weight: 600;
+    }
+    #profileCancelBtn { background: var(--bg-elevated); color: var(--text-normal); }
+    #profileSaveBtn { background: var(--accent); color: white; }
+    #profileStatus { min-height: 16px; margin-top: 8px; color: var(--text-muted); font-size: 12px; }
+    .reply-notification {
+      position: fixed; right: 20px; bottom: 20px; max-width: 360px; padding: 12px 14px;
+      background: var(--bg-elevated); color: var(--text-normal); border: 1px solid var(--accent);
+      border-radius: 8px; box-shadow: 0 8px 30px rgba(0,0,0,.4); z-index: 55;
+      cursor: pointer; display: none;
+    }
+    .reply-notification.visible { display: block; animation: msgIn .2s ease; }
+
+    @media (max-width: 900px) { .online-users { display: none; } }
+    @media (max-width: 640px) { .channel-sidebar, .server-rail { display: none; } }
+
+    #authOverlay {
+      position: fixed; inset: 0;
+      background: radial-gradient(circle at 30% 20%, #2b2d55 0%, #1e1f22 55%);
+      display: flex; align-items: center; justify-content: center; z-index: 50;
+    }
+
+    .auth-card { background: var(--bg-sidebar); padding: 32px; border-radius: 8px; width: 320px; max-width: 90vw; box-shadow: 0 16px 40px rgba(0,0,0,0.5); }
+    .auth-card h2 { margin: 0 0 6px; color: var(--text-bright); font-size: 22px; }
+    .auth-card p.subtitle { margin: 0 0 20px; font-size: 14px; color: var(--text-muted); }
+    .auth-card label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; color: var(--text-muted); margin: 14px 0 6px; }
+    .auth-card input { width: 100%; padding: 10px; border: none; border-radius: 4px; background: var(--bg-deepest); color: white; font-size: 14px; outline: none; }
+    .auth-card input:focus { box-shadow: 0 0 0 2px var(--accent); }
+    .auth-card button[type="submit"] { width: 100%; margin-top: 20px; padding: 11px; border: none; border-radius: 4px; background: var(--accent); color: white; font-weight: 600; font-size: 14px; cursor: pointer; }
+    .auth-card button[type="submit"]:hover { background: var(--accent-hover); }
+    .auth-card button[type="submit"]:disabled { opacity: 0.6; cursor: default; }
+    #authToggleBtn { margin-top: 14px; width: 100%; background: none; border: none; color: #949ba4; cursor: pointer; font-size: 13px; }
+    #authToggleBtn:hover { color: var(--text-bright); text-decoration: underline; }
+    #authError { margin-top: 10px; font-size: 12px; color: var(--danger); min-height: 14px; }
+  </style>
+</head>
+
+<body>
+
+  <div id="authOverlay">
+    <div class="auth-card">
+      <h2>Welcome to Obsidian Lounge</h2>
+      <p class="subtitle">Sign in with a username and password — no email needed.</p>
+      <form id="authForm">
+        <label for="authUsername">Username</label>
+        <input id="authUsername" autocomplete="username" maxlength="20" required />
+
+        <label for="authPassword">Password</label>
+        <input id="authPassword" type="password" autocomplete="current-password" required />
+
+        <div id="authError"></div>
+
+        <button type="submit" id="authSubmitBtn">Log In</button>
+      </form>
+      <button id="authToggleBtn" type="button">Need an account? Register</button>
+    </div>
+  </div>
+
+
+  <div id="profileModal" class="profile-modal">
+    <div class="profile-card">
+      <h3>Profile</h3>
+      <div class="profile-preview">
+        <div class="avatar" id="profilePreviewAvatar"></div>
+        <div>
+          <div style="font-weight:600;color:var(--text-bright)" id="profilePreviewName"></div>
+          <div style="font-size:12px;color:var(--text-muted)">Choose a profile picture</div>
+        </div>
+      </div>
+      <input id="profileFileInput" type="file" accept="image/*" />
+      <div id="profileStatus"></div>
+      <div class="profile-modal-actions">
+        <button id="profileCancelBtn" type="button">Cancel</button>
+        <button id="profileSaveBtn" type="button">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="replyNotification" class="reply-notification"></div>
+
+  <div class="app" id="app">
+    <div class="server-rail">
+      <div class="server-icon" title="Obsidian Lounge">OL</div>
+    </div>
+
+    <div class="channel-sidebar">
+      <div class="server-header">Obsidian Lounge</div>
+      <div class="channel-list" id="chatTabs">
+        <div class="channel-category">Text Channels</div>
+        <button id="public" class="channel-item active" data-room="public"><span class="hash">#</span> public</button>
+        <div class="channel-category" id="dmCategory" style="display:none;">Direct Messages</div>
+        <div id="dmList"></div>
+      </div>
+      <div class="user-panel">
+        <div class="avatar" id="myAvatar"></div>
+        <div class="user-panel-info">
+          <div class="user-panel-name" id="whoAmI"></div>
+          <div class="user-panel-status">Online</div>
+        </div>
+        <button id="profileBtn" class="profile-settings-btn" title="Profile picture">⚙</button>
+        <button id="logoutBtn" title="Log out">⏻</button>
+      </div>
+    </div>
+
+    <div class="chat-container">
+      <div class="chat-header">
+        <span class="chat-header-hash" id="chatHeaderHash">#</span>
+        <span id="chatHeaderTitle">public</span>
+      </div>
+
+      <div id="messages"></div>
+      <div id="typingIndicator"></div>
+      <div id="replyBar"></div>
+
+      <div class="input-box">
+        <div id="mediaPreview"></div>
+        <div class="input-row">
+          <button id="attachBtn" type="button" title="Attach media">📎</button>
+          <input id="messageInput" placeholder="Message #public" />
+        </div>
+        <input type="file" id="fileInput" accept="image/*,video/*,audio/*" hidden />
+      </div>
+    </div>
+
+    <div class="online-users">
+      <div class="online-header">Online — <span id="onlineCount">0</span></div>
+      <ul id="onlineList"></ul>
+    </div>
+  </div>
+
+  <script>
+    const SUPABASE_URL = "https://szfcdeejkgkaxxnstgtt.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable_PhVi37ylD4sSPZeZnW1uuA_GcTJg41O";
+
+    const { createClient } = supabase;
+    const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const EMAIL_DOMAIN = "@users.obsidian-lounge.app";
+
+    const CLOUDINARY_CLOUD_NAME = "nf1ag9ev";
+    const CLOUDINARY_UPLOAD_PRESET = "obsidian-lounge";
+    const MAX_FILE_BYTES = 10 * 1024 * 1024;
+
+    const AVATAR_COLORS = ["#5865f2", "#57f287", "#eb459e", "#faa61a", "#3ba55c", "#ed4245", "#9b59b6", "#1abc9c", "#e67e22", "#3498db"];
+
+    function avatarColor(name) {
+      let hash = 0;
+      const str = name || "?";
+      for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+      return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+    }
+
+    function avatarInitial(name) {
+      return (name || "?").trim().charAt(0).toUpperCase() || "?";
+    }
+
+    function avatarHtml(name, size, avatarUrl) {
+      const cls = size === "sm" ? "avatar" : "msg-avatar";
+      const content = avatarUrl
+        ? `<img src="${escapeHtml(avatarUrl)}" alt="${escapeHtml(name)}" />`
+        : avatarInitial(name);
+      return `<div class="${cls}" style="background:${avatarColor(name)}">${content}</div>`;
+    }
+
+    function setAvatarElement(el, name, avatarUrl) {
+      el.style.background = avatarColor(name);
+      el.innerHTML = avatarUrl
+        ? `<img src="${escapeHtml(avatarUrl)}" alt="${escapeHtml(name)}" />`
+        : escapeHtml(avatarInitial(name));
+    }
+
+    let userId = null;
+    let username = null;
+    let activeRoom = "public";
+    let replyTo = null;
+    let pendingMedia = null;
+    let typingTimers = {};
+    let presenceInitialized = false;
+    let presenceChannel = null;
+    let roomChannel = null;
+    let lastRenderKey = null;
+    let roomLabels = { public: "public" };
+    let myAvatarUrl = null;
+    let replyNotificationCount = 0;
+    let lastReplyNotification = null;
+
+    const authOverlay = document.getElementById("authOverlay");
+    const authForm = document.getElementById("authForm");
+    const authUsernameInput = document.getElementById("authUsername");
+    const authPasswordInput = document.getElementById("authPassword");
+    const authError = document.getElementById("authError");
+    const authSubmitBtn = document.getElementById("authSubmitBtn");
+    const authToggleBtn = document.getElementById("authToggleBtn");
+    const appEl = document.getElementById("app");
+    const whoAmIEl = document.getElementById("whoAmI");
+    const myAvatarEl = document.getElementById("myAvatar");
+    const profileBtn = document.getElementById("profileBtn");
+    const profileModal = document.getElementById("profileModal");
+    const profileFileInput = document.getElementById("profileFileInput");
+    const profilePreviewAvatar = document.getElementById("profilePreviewAvatar");
+    const profilePreviewName = document.getElementById("profilePreviewName");
+    const profileStatus = document.getElementById("profileStatus");
+    const replyNotification = document.getElementById("replyNotification");
+
+    let authMode = "login";
+
+    function updateAuthModeUI() {
+      authSubmitBtn.textContent = authMode === "login" ? "Log In" : "Create Account";
+      authToggleBtn.textContent = authMode === "login" ? "Need an account? Register" : "Have an account? Log in";
+      authError.textContent = "";
+    }
+
+    authToggleBtn.onclick = () => {
+      authMode = authMode === "login" ? "register" : "login";
+  
+    // Profile picture controls
+    profileBtn.onclick = () => {
+      profilePreviewName.textContent = username || "Anonymous";
+      setAvatarElement(profilePreviewAvatar, username, myAvatarUrl);
+      profileStatus.textContent = "";
+      profileFileInput.value = "";
+      profileModal.classList.add("open");
+    };
+
+    document.getElementById("profileCancelBtn").onclick = () => profileModal.classList.remove("open");
+    profileModal.onclick = e => {
+      if (e.target === profileModal) profileModal.classList.remove("open");
+    };
+
+    async function uploadProfilePicture(file) {
+      if (!file || !file.type.startsWith("image/")) throw new Error("Please choose an image.");
+      if (file.size > MAX_FILE_BYTES) throw new Error("Profile picture must be 10MB or smaller.");
+      const url = await uploadToCloudinary(file);
+      return url;
+    }
+
+    profileFileInput.onchange = () => {
+      const file = profileFileInput.files[0];
+      if (!file) return;
+      const localUrl = URL.createObjectURL(file);
+      setAvatarElement(profilePreviewAvatar, username, localUrl);
+      profileStatus.textContent = "Ready to upload.";
+    };
+
+    document.getElementById("profileSaveBtn").onclick = async () => {
+      const file = profileFileInput.files[0];
+      if (!file) {
+        profileModal.classList.remove("open");
+        return;
+      }
+
+      profileStatus.textContent = "Uploading...";
+      try {
+        const url = await uploadProfilePicture(file);
+        const { error } = await sb.from("profiles").update({ avatar_url: url }).eq("id", userId);
+        if (error) throw error;
+
+        myAvatarUrl = url;
+        setAvatarElement(myAvatarEl, username, myAvatarUrl);
+        profileStatus.textContent = "Profile picture updated.";
+        profileModal.classList.remove("open");
+      } catch (err) {
+        profileStatus.textContent = err.message || "Could not update profile picture.";
+      }
+    };
+
+    updateAuthModeUI();
+    };
+
+    function normalizeUsername(name) {
+      return name.trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
+    }
+
+    function friendlyAuthError(err) {
+      const msg = (err && err.message) || "";
+      if (msg.includes("already registered") || (err && err.code === "23505")) return "That username is already taken.";
+      if (msg.includes("Invalid login credentials")) return "Incorrect username or password.";
+      if (msg.includes("Password should be")) return "Password must be at least 6 characters.";
+      if (msg.includes("rate limit")) return "Too many attempts. Try again in a bit.";
+      return "Something went wrong. Please try again.";
+    }
+
+    authForm.addEventListener("submit", async e => {
+      e.preventDefault();
+      authError.textContent = "";
+
+      const rawName = authUsernameInput.value.trim();
+      const normalized = normalizeUsername(rawName);
+      const pass = authPasswordInput.value;
+
+      if (normalized.length < 3 || normalized.length > 20) {
+        authError.textContent = "Username must be 3-20 characters (letters, numbers, underscore).";
+        return;
+      }
+      if (pass.length < 6) {
+        authError.textContent = "Password must be at least 6 characters.";
+        return;
+      }
+
+      authSubmitBtn.disabled = true;
+      const fakeEmail = normalized + EMAIL_DOMAIN;
+
+      try {
+        if (authMode === "register") {
+          const { data, error } = await sb.auth.signUp({ email: fakeEmail, password: pass });
+          if (error) throw error;
+
+          const uid = data.user.id;
+          const { error: profileError } = await sb.from("profiles").insert({ id: uid, username: rawName, username_lower: normalized });
+
+          if (profileError) {
+            authError.textContent = profileError.code === "23505" ? "That username is already taken." : "Something went wrong creating your profile.";
+            authSubmitBtn.disabled = false;
+            return;
+          }
+        } else {
+          const { error } = await sb.auth.signInWithPassword({ email: fakeEmail, password: pass });
+          if (error) throw error;
+        }
+      } catch (err) {
+        authError.textContent = friendlyAuthError(err);
+      }
+
+      authSubmitBtn.disabled = false;
+    });
+
+    document.getElementById("logoutBtn").onclick = () => sb.auth.signOut();
+
+    sb.auth.onAuthStateChange(async (event, session) => {
+      if (session && session.user) {
+        userId = session.user.id;
+
+        const { data: profile } = await sb.from("profiles").select("username, avatar_url").eq("id", userId).single();
+        username = profile ? profile.username : "Anonymous";
+        myAvatarUrl = profile ? profile.avatar_url : null;
+
+        authOverlay.style.display = "none";
+        appEl.classList.add("visible");
+        whoAmIEl.textContent = username;
+        setAvatarElement(myAvatarEl, username, myAvatarUrl);
+
+        authForm.reset();
+
+        if ("Notification" in window && Notification.permission === "default") {
+          Notification.requestPermission().catch(() => {});
+        }
+
+        if (!presenceInitialized) {
+          presenceInitialized = true;
+          initPresenceAndRoom();
+        }
+      } else {
+        userId = null;
+        username = null;
+        presenceInitialized = false;
+        authOverlay.style.display = "flex";
+        appEl.classList.remove("visible");
+      }
+    });
+
+    function escapeHtml(str) {
+      const div = document.createElement("div");
+      div.textContent = str == null ? "" : String(str);
+      return div.innerHTML;
+    }
+
+    function formatTime(ts) {
+      if (!ts) return "";
+      return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    }
+
+    function renderMedia(media) {
+      const safeUrl = encodeURI(media.url);
+      if (media.type === "image") return `<div class="media-attachment"><img src="${safeUrl}" alt="attachment" loading="lazy" /></div>`;
+      if (media.type === "video") return `<div class="media-attachment"><video src="${safeUrl}" controls></video></div>`;
+      if (media.type === "audio") return `<div class="media-attachment"><audio src="${safeUrl}" controls></audio></div>`;
+      return `<div class="media-attachment"><a href="${safeUrl}" target="_blank" rel="noopener">📎 ${escapeHtml(media.name || "file")}</a></div>`;
+    }
+
+    function replyHtml(reply) {
+      return `<div class="reply-preview"><b>${escapeHtml(reply.username)}</b> ${escapeHtml(reply.text)}</div>`;
+    }
+
+    function renderMessage(m) {
+      const row = document.createElement("div");
+      const time = formatTime(m.created_at);
+      const grouped =
+        !m.reply &&
+        lastRenderKey &&
+        lastRenderKey.userId === m.user_id &&
+        (new Date(m.created_at).getTime() || Date.now()) - lastRenderKey.time < 5 * 60 * 1000;
+
+      row.className = "msg-row" + (grouped ? " grouped" : "");
+      row.dataset.messageId = m.id || "";
+
+      const isDeleted = !!m.deleted_at;
+      const displayText = isDeleted ? "This message was deleted." : m.text;
+      const avatarUrl = m.avatar_url || null;
+      const reply = m.reply ? { ...m.reply } : null;
+
+      const replyMarkup = reply
+        ? `<div class="reply-preview" data-reply-target="${escapeHtml(reply.id || "")}"><b>${escapeHtml(reply.username || "Unknown")}</b> ${escapeHtml(reply.text || "")}</div>`
+        : "";
+
+      const actionMarkup = m.user_id === userId && !isDeleted
+        ? `<div class="msg-actions">
+             <button class="msg-action edit" type="button">Edit</button>
+             <button class="msg-action delete" type="button">Delete</button>
+           </div>`
+        : "";
+
+      const bodyMarkup = `
+        ${replyMarkup}
+        <div class="msg-text ${isDeleted ? "deleted-message" : ""}">${escapeHtml(displayText || "")}${m.edited_at && !isDeleted ? '<span class="edited-label">(edited)</span>' : ""}</div>
+        ${m.media && !isDeleted ? renderMedia(m.media) : ""}
+      `;
+
+      if (!grouped) {
+        row.innerHTML = `
+          ${avatarHtml(m.username, null, avatarUrl)}
+          <div class="msg-body">
+            <div class="msg-meta"><span class="msg-username">${escapeHtml(m.username)}</span><span class="msg-time">${time}</span></div>
+            ${bodyMarkup}
+          </div>
+          ${actionMarkup}
+        `;
+      } else {
+        row.innerHTML = `
+          <div class="msg-avatar-spacer"><span class="msg-time-hover">${time}</span></div>
+          <div class="msg-body">${bodyMarkup}</div>
+          ${actionMarkup}
+        `;
+      }
+
+      const replyPreview = row.querySelector(".reply-preview");
+      if (replyPreview) {
+        replyPreview.onclick = e => {
+          e.stopPropagation();
+          const targetId = replyPreview.dataset.replyTarget;
+          const target = document.querySelector(`[data-message-id="${CSS.escape(targetId)}"]`);
+          if (target) {
+            target.scrollIntoView({ behavior: "smooth", block: "center" });
+            target.classList.add("reply-target-highlight");
+            setTimeout(() => target.classList.remove("reply-target-highlight"), 1800);
+          }
+        };
+      }
+
+      const editBtn = row.querySelector(".msg-action.edit");
+      if (editBtn) editBtn.onclick = e => {
+        e.stopPropagation();
+        editMessage(m, row);
+      };
+
+      const deleteBtn = row.querySelector(".msg-action.delete");
+      if (deleteBtn) deleteBtn.onclick = async e => {
+        e.stopPropagation();
+        if (!confirm("Delete this message?")) return;
+        const { error } = await sb.from("messages")
+          .update({ deleted_at: new Date().toISOString() })
+          .eq("id", m.id)
+          .eq("user_id", userId);
+        if (error) alert("Could not delete the message. Check your database permissions.");
+      };
+
+      row.onclick = () => {
+        if (!m.text || isDeleted) return;
+        replyTo = { id: m.id, username: m.username, text: m.text };
+        const bar = document.getElementById("replyBar");
+        bar.textContent = "Replying to " + m.username + ": " + m.text;
+        bar.style.display = "block";
+      };
+
+      lastRenderKey = { userId: m.user_id, time: new Date(m.created_at).getTime() || Date.now() };
+
+      const msgBox = document.getElementById("messages");
+      msgBox.appendChild(row);
+      msgBox.scrollTop = msgBox.scrollHeight;
+
+      if (m.reply && m.reply.id && m.reply.user_id === userId && m.user_id !== userId) {
+        notifyReply(m);
+      }
+    }
+
+    async function editMessage(m, row) {
+      const current = m.text || "";
+      const edited = prompt("Edit message:", current);
+      if (edited === null || edited.trim() === current.trim()) return;
+      const newText = edited.trim();
+      if (!newText) return;
+
+      const { error } = await sb.from("messages")
+        .update({ text: newText, edited_at: new Date().toISOString() })
+        .eq("id", m.id)
+        .eq("user_id", userId);
+
+      if (error) {
+        alert("Could not edit the message. Check your database permissions.");
+      }
+    }
+
+    function notifyReply(m) {
+      lastReplyNotification = m;
+      replyNotificationCount++;
+      replyNotification.textContent = `${m.username} replied to your message: "${m.text || "attachment"}"`;
+      replyNotification.classList.add("visible");
+      setTimeout(() => replyNotification.classList.remove("visible"), 5000);
+
+      if ("Notification" in window && Notification.permission === "granted") {
+        new Notification(`${m.username} replied to you`, { body: m.text || "You received a reply." });
+      }
+    }
+
+    replyNotification.onclick = () => {
+      if (!lastReplyNotification || !lastReplyNotification.reply) return;
+      const target = document.querySelector(`[data-message-id="${CSS.escape(lastReplyNotification.reply.id || "")}"]`);
+      if (target) {
+        target.scrollIntoView({ behavior: "smooth", block: "center" });
+        target.classList.add("reply-target-highlight");
+        setTimeout(() => target.classList.remove("reply-target-highlight"), 1800);
+      }
+      replyNotification.classList.remove("visible");
+    };
+
+    async function setUsername(newName) {
+      const trimmed = newName.trim();
+      if (!trimmed) return;
+      username = trimmed;
+      whoAmIEl.textContent = username;
+      setAvatarElement(myAvatarEl, username, myAvatarUrl);
+      await sb.from("profiles").update({ username: trimmed }).eq("id", userId);
+      if (presenceChannel) await presenceChannel.track({ username: trimmed });
+    }
+
+    function setActiveTab(room) {
+      document.querySelectorAll(".channel-item").forEach(b => b.classList.remove("active"));
+      const btn = document.getElementById(room);
+      if (btn) btn.classList.add("active");
+
+      const label = roomLabels[room] || room;
+      document.getElementById("chatHeaderTitle").textContent = label;
+      document.getElementById("chatHeaderHash").textContent = room === "public" ? "#" : "@";
+      document.getElementById("messageInput").placeholder = room === "public" ? "Message #public" : "Message @" + label;
+    }
+
+    function updateTypingIndicator() {
+      const names = Object.keys(typingTimers);
+      document.getElementById("typingIndicator").textContent = names.length ? names.join(", ") + " is typing..." : "";
+    }
+
+    function handleTypingBroadcast(payload) {
+      const name = payload.payload && payload.payload.username;
+      if (!name || name === username) return;
+      clearTimeout(typingTimers[name]);
+      typingTimers[name] = setTimeout(() => {
+        delete typingTimers[name];
+        updateTypingIndicator();
+      }, 1500);
+      updateTypingIndicator();
+    }
+
+    async function loadRoom(room) {
+      activeRoom = room;
+      replyTo = null;
+      pendingMedia = null;
+      typingTimers = {};
+      lastRenderKey = null;
+
+      document.getElementById("replyBar").style.display = "none";
+      document.getElementById("mediaPreview").textContent = "";
+      document.getElementById("typingIndicator").textContent = "";
+      document.getElementById("messages").innerHTML = "";
+
+      setActiveTab(room);
+
+      if (roomChannel) {
+        await sb.removeChannel(roomChannel);
+        roomChannel = null;
+      }
+
+      const { data, error } = await sb.from("messages").select("*").eq("room", room).order("created_at", { ascending: true }).limit(200);
+      if (!error && data) data.forEach(renderMessage);
+
+      roomChannel = sb
+        .channel("room:" + room)
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", filter: `room=eq.${room}` }, payload => renderMessage(payload.new))
+        .on("postgres_changes", { event: "UPDATE", schema: "public", table: "messages", filter: `room=eq.${room}` }, payload => {
+          const existing = document.querySelector(`[data-message-id="${CSS.escape(payload.new.id || "")}"]`);
+          if (existing) {
+            const wasAtBottom = Math.abs(document.getElementById("messages").scrollHeight - document.getElementById("messages").scrollTop - document.getElementById("messages").clientHeight) < 80;
+            existing.remove();
+            // Re-rendering the full room keeps grouping and edited/deleted state consistent.
+            loadRoom(room).then(() => {
+              if (wasAtBottom) {
+                const box = document.getElementById("messages");
+                box.scrollTop = box.scrollHeight;
+              }
+            });
+          }
+        })
+        .on("broadcast", { event: "typing" }, handleTypingBroadcast)
+        .subscribe();
+    }
+
+    const fileInput = document.getElementById("fileInput");
+    const attachBtn = document.getElementById("attachBtn");
+    const mediaPreview = document.getElementById("mediaPreview");
+
+    attachBtn.onclick = () => fileInput.click();
+
+    async function uploadToCloudinary(file) {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/auto/upload`, { method: "POST", body: formData });
+      if (!res.ok) throw new Error("Upload failed");
+      const data = await res.json();
+      return data.secure_url;
+    }
+
+    fileInput.addEventListener("change", async () => {
+      const file = fileInput.files[0];
+      if (!file) return;
+
+      if (file.size > MAX_FILE_BYTES) {
+        mediaPreview.textContent = "File too large (max 10MB).";
+        fileInput.value = "";
+        return;
+      }
+
+      mediaPreview.textContent = "Uploading " + file.name + "...";
+
+      try {
+        const url = await uploadToCloudinary(file);
+        const type = file.type.startsWith("image/") ? "image" : file.type.startsWith("video/") ? "video" : file.type.startsWith("audio/") ? "audio" : "file";
+        pendingMedia = { url, type, name: file.name };
+        mediaPreview.textContent = "Attached: " + file.name + " — press Enter to send (Esc to cancel)";
+      } catch (err) {
+        mediaPreview.textContent = "Upload failed. Try again.";
+        pendingMedia = null;
+      }
+
+      fileInput.value = "";
+    });
+
+    const input = document.getElementById("messageInput");
+
+    input.addEventListener("input", () => {
+      if (!userId || !roomChannel) return;
+      roomChannel.send({ type: "broadcast", event: "typing", payload: { username } });
+    });
+
+    input.addEventListener("keydown", async e => {
+      if (e.key === "Escape") {
+        replyTo = null;
+        pendingMedia = null;
+        mediaPreview.textContent = "";
+        document.getElementById("replyBar").style.display = "none";
+      }
+
+      if (e.key === "Enter") {
+        const text = input.value.trim();
+        if (!text && !pendingMedia) return;
+
+        if (text.startsWith("/name ")) {
+          const newName = text.slice(6).trim();
+          if (newName.length >= 1 && newName.length <= 20) setUsername(newName);
+          input.value = "";
+          return;
+        }
+
+        const payload = { room: activeRoom, user_id: userId, username, avatar_url: myAvatarUrl, text };
+        if (pendingMedia) payload.media = pendingMedia;
+        if (replyTo) payload.reply = replyTo;
+
+        const { error } = await sb.from("messages").insert(payload);
+
+        if (!error) {
+          pendingMedia = null;
+          mediaPreview.textContent = "";
+          replyTo = null;
+          document.getElementById("replyBar").style.display = "none";
+          input.value = "";
+        }
+      }
+    });
+
+    function renderOnlineUsers(state) {
+      const list = document.getElementById("onlineList");
+      list.innerHTML = "";
+      const entries = Object.entries(state);
+      document.getElementById("onlineCount").textContent = entries.length;
+
+      entries.forEach(([id, presences]) => {
+        const name = (presences[0] && presences[0].username) || "Unknown";
+
+        const li = document.createElement("li");
+        li.innerHTML = `
+          <div class="avatar-wrap">${avatarHtml(name, "sm")}<span class="status-dot"></span></div>
+          <span class="name">${escapeHtml(name)}${id === userId ? " (You)" : ""}</span>
+        `;
+
+        if (id !== userId) {
+          const btn = document.createElement("button");
+          btn.className = "dm-btn";
+          btn.textContent = "DM";
+          btn.onclick = () => openDM(id, name);
+          li.appendChild(btn);
+        }
+
+        list.appendChild(li);
+      });
+    }
+
+    function initPresenceAndRoom() {
+      presenceChannel = sb.channel("online-users", { config: { presence: { key: userId } } });
+
+      presenceChannel
+        .on("presence", { event: "sync" }, () => renderOnlineUsers(presenceChannel.presenceState()))
+        .subscribe(async status => {
+          if (status === "SUBSCRIBED") await presenceChannel.track({ username });
+        });
+
+      loadRoom("public");
+    }
+
+    function getDMId(a, b) {
+      return [a, b].sort().join("_");
+    }
+
+    function openDM(targetId, targetName) {
+      const room = "dm_" + getDMId(userId, targetId);
+      roomLabels[room] = targetName;
+
+      if (!document.getElementById(room)) {
+        document.getElementById("dmCategory").style.display = "block";
+        const btn = document.createElement("button");
+        btn.id = room;
+        btn.className = "channel-item";
+        btn.innerHTML = `<span class="hash">@</span> ${escapeHtml(targetName)}`;
+        btn.onclick = () => loadRoom(room);
+        document.getElementById("dmList").appendChild(btn);
+      }
+
+      loadRoom(room);
+    }
+
+    document.getElementById("public").onclick = () => loadRoom("public");
+
+
+    // Profile picture controls
+    profileBtn.onclick = () => {
+      profilePreviewName.textContent = username || "Anonymous";
+      setAvatarElement(profilePreviewAvatar, username, myAvatarUrl);
+      profileStatus.textContent = "";
+      profileFileInput.value = "";
+      profileModal.classList.add("open");
+    };
+
+    document.getElementById("profileCancelBtn").onclick = () => profileModal.classList.remove("open");
+    profileModal.onclick = e => {
+      if (e.target === profileModal) profileModal.classList.remove("open");
+    };
+
+    async function uploadProfilePicture(file) {
+      if (!file || !file.type.startsWith("image/")) throw new Error("Please choose an image.");
+      if (file.size > MAX_FILE_BYTES) throw new Error("Profile picture must be 10MB or smaller.");
+      const url = await uploadToCloudinary(file);
+      return url;
+    }
+
+    profileFileInput.onchange = () => {
+      const file = profileFileInput.files[0];
+      if (!file) return;
+      const localUrl = URL.createObjectURL(file);
+      setAvatarElement(profilePreviewAvatar, username, localUrl);
+      profileStatus.textContent = "Ready to upload.";
+    };
+
+    document.getElementById("profileSaveBtn").onclick = async () => {
+      const file = profileFileInput.files[0];
+      if (!file) {
+        profileModal.classList.remove("open");
+        return;
+      }
+
+      profileStatus.textContent = "Uploading...";
+      try {
+        const url = await uploadProfilePicture(file);
+        const { error } = await sb.from("profiles").update({ avatar_url: url }).eq("id", userId);
+        if (error) throw error;
+
+        myAvatarUrl = url;
+        setAvatarElement(myAvatarEl, username, myAvatarUrl);
+        profileStatus.textContent = "Profile picture updated.";
+        profileModal.classList.remove("open");
+      } catch (err) {
+        profileStatus.textContent = err.message || "Could not update profile picture.";
+      }
+    };
+
+    updateAuthModeUI();
+  </script>
+
+<!--
+  REQUIRED SUPABASE SCHEMA ADDITIONS / POLICIES
+
+  Run these once in Supabase SQL Editor:
+
+  alter table public.profiles add column if not exists avatar_url text;
+
+  alter table public.messages add column if not exists edited_at timestamptz;
+  alter table public.messages add column if not exists deleted_at timestamptz;
+
+  The existing messages table already needs an id primary key for edit/delete/reply highlighting.
+  Ensure RLS policies allow authenticated users to UPDATE/DELETE only their own messages:
+
+  create policy "Users can update own messages"
+  on public.messages for update
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+  create policy "Users can delete own messages"
+  on public.messages for delete
+  to authenticated
+  using (auth.uid() = user_id);
+
+  Ensure authenticated users can update their own profile:
+
+  create policy "Users can update own profile"
+  on public.profiles for update
+  to authenticated
+  using (auth.uid() = id)
+  with check (auth.uid() = id);
+
+  If your existing schema has NOT NULL constraints on fields not shown here, keep those unchanged.
+-->
+
+</body>
+</html>
